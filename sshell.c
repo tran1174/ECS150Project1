@@ -53,7 +53,7 @@ void checkJobTable() //function to check if there is a job that is now completed
 				if (running == 0)
 				{
 					if (!strcmp("sleep 1&",jobTable[i].command))
-						done == 1;
+						done = 1;
 					break;
 				}
 				else
