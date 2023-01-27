@@ -371,6 +371,7 @@ char **parseCMD(char *string)
 		{
 			redOut2(strtok(NULL, " "));
 			buffer = strtok(NULL, " ");
+			buffer = strtok(NULL, " ");
 		}
 		args[i] = buffer;
 		buffer = strtok(NULL, " ");
