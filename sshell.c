@@ -7,13 +7,8 @@
 
 #define CMDLINE_MAX 512
 #define ARG_MAX 16
-int background = 0;
-int numJob = 0;
-pid_t PIDs[500];
-char CMDs[500][512];
-int freePos = 0;
-int runCMD(char *argv[], int whatNo /*, int wait*/);
-int runCMDPipe(char *argv[], int whatNo /*, int wait*/);
+int runCMD(char *argv[], int whatNo);
+int runCMDPipe(char *argv[], int whatNo);
 char **parseCMD(char *string);
 void printStringArray(char **arr);
 char *preProcessCMD(char *cmd);
@@ -27,16 +22,17 @@ struct job
 	pid_t processID[4];
 	char command[512];
 	int statuses[4];
-	int pgid;
 	int ncp;
 	int printed;
 };
 
-struct job jobTable[500];
+struct job jobTable[5000]; // job table to keep track of all jobs
+int background = 0; //keeps track if there is a background statement
+int numJob = 0; // keeps track of what number we are on in the jobTable
 
-void printJob(struct job s)
+void printJob(struct job s) //function to print completion statement from job table
 {
-	fprintf(stderr, "+ completed '%s' ", s.command);
+	fprintf(stderr, "+ completed '%s' ", s.command); 
 	for (int i = 0; i < s.ncp; i++)
 	{
 		fprintf(stderr, "[%d]", s.statuses[i]);
@@ -44,28 +40,16 @@ void printJob(struct job s)
 	fprintf(stderr, "\n");
 }
 
-void printJobValues(struct job s)
+void checkJobTable() //function to check if there is a job that is now completed that hasn't been printed
 {
-	for (int i = 0; i < s.ncp; i++)
-	{
-		printf("%ls\n", s.processID);
-		printf("%ls\n", s.statuses);
-	}
-	printf("%s\n", s.command);
-	printf("%d\n", s.ncp);
-	printf("%d\n", s.printed);
-}
-
-void checkJobTable()
-{
-	for (int i = 0; i < 500; i++)
+	for (int i = 0; i < 5000; i++)
 	{
 		if (jobTable[i].printed == 0)
 		{
 			int done = 0;
 			for (int j = 0; j < jobTable[i].ncp; j++)
 			{
-				int running = waitpid(jobTable[i].processID[j], &jobTable[i].statuses[j], WNOHANG);
+				int running = waitpid(jobTable[i].processID[j], &jobTable[i].statuses[j], WNOHANG); //check status of each command within job. if they are all done, the whole job is done, so print
 				if (running == 0)
 				{
 					break;
@@ -101,7 +85,7 @@ enum errors
 	none
 };
 
-void printExit(char *myCommand, int statuses[], int ncp)
+void printExit(char *myCommand, int statuses[], int ncp) //print from commands, not job table
 {
 	fprintf(stderr, "+ completed '%s' ", myCommand);
 	for (int i = 0; i < ncp; i++)
@@ -200,8 +184,7 @@ char *preProcessCMD(char *cmd)
 
 void runPiped(char *cmd, char *originalCMD)
 {
-	strcpy(jobTable[numJob].command, originalCMD);
-	//char storage[512][512];
+	strcpy(jobTable[numJob].command, originalCMD); //take note of command and add it to jobtable
 	char temp[512];
 	strcpy(temp, cmd);
 	char *cmd1 = NULL;
@@ -218,8 +201,7 @@ void runPiped(char *cmd, char *originalCMD)
 		j++;
 		buffer = strtok(NULL, "|");
 	}
-	jobTable[numJob].ncp = j;
-	// pid_t pids[j];
+	jobTable[numJob].ncp = j;  // take note of amount of commands and add it to job table
 	int statuses[j];
 	char **allCMDS2[] = {parseCMD(allCMDS[0]), parseCMD(allCMDS[1]), parseCMD(allCMDS[2]), parseCMD(allCMDS[3]), NULL};
 
@@ -256,31 +238,15 @@ void runPiped(char *cmd, char *originalCMD)
 	if (!background)
 	{
 		printExit(originalCMD, statuses, j);
-		jobTable[numJob].printed = 1;
+		jobTable[numJob].printed = 1; //if it isn't a background task, we need to print asap, and can mark it as printed and done.
 	}
-	// for (int k = 0; k < j; k++)
-	//{
-	//	printf("%d\n",statuses[k]);
-	//		printf("%d\n",jobTable[numJob].statuses[k]);
-	//	}
-
-	// exit(0);
 }
 // fork+wait+exit from Jean Porquet
 int runCMDPipe(char **argv, int whatNo /*, int wait*/)
 {
 	pid_t pid;
 	pid = fork();
-	jobTable[numJob].processID[whatNo] = pid;
-	if (whatNo == 0)
-	{
-		setpgid(0, 0);
-		jobTable[numJob].pgid = pid;
-	}
-	else
-	{
-		setpgid(0, jobTable[numJob].pgid);
-	}
+	jobTable[numJob].processID[whatNo] = pid; // keep track of the process id so that we can use it later
 	if (pid == 0)
 	{
 		// Child
@@ -426,7 +392,14 @@ int main(void)
 		nl = strchr(cmd, '\n');
 		if (nl)
 			*nl = '\0';
-
+		if(!strcmp(cmd,"\0"))
+		{
+			checkJobTable();
+			memset(cmd, 0, sizeof cmd);
+			dup2(savedOut, STDOUT_FILENO);
+			dup2(savedIn, STDIN_FILENO);
+			goto reset;
+		}
 		char *postCMD = preProcessCMD(cmd);
 
 		/* Builtin commands */
@@ -454,8 +427,6 @@ int main(void)
 		checkJobTable();
 		runPiped(postCMD, originalCMD);
 		numJob++;
-		// printJobValues(jobTable[0]);
-		//  runCMD(args, originalCMD);
 
 		/* Free all manually allocated memory*/
 		memset(cmd, 0, sizeof cmd);
