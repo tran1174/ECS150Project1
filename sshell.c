@@ -402,6 +402,12 @@ int main(void)
 		if (fgets(cmd, CMDLINE_MAX, stdin) == NULL)
 			exit(1); // Error: Failed to get command from CLI
 
+		/* Print command line if stdin is not provided by terminal */
+		if (!isatty(STDIN_FILENO)) {
+		        printf("%s", cmd);
+		        fflush(stdout);
+		}
+
 		/* Remove trailing newline from command line */
 		nl = strchr(cmd, '\n');
 		if (nl)
@@ -413,11 +419,7 @@ int main(void)
 
 		char **args = parseCMD(cmd2);
 
-		/* Print command line if stdin is not provided by terminal */
-		if (!isatty(STDIN_FILENO)) {
-		        printf("%s", cmd);
-		        fflush(stdout);
-		}
+		
 
 		/* Remove trailing newline from command line */
 		nl = strchr(cmd, '\n');
