@@ -1,68 +1,45 @@
-﻿Anthony and I chose to break our code up into functions for each section. 
-The development of each function for phases is documented below.
+﻿# ECS 150 Project #1 - Simple Shell
+**Joshua Hernandez, Anthony Tran**
+## Summary
+Our program, `sshell`, is a simple shell that accepts input from the user and executes it as a job. It does five things:
 
-Phase 1:
-Our basic command runner uses the fork+wait+exit taught to us by 
-the Professor and utilizes execvp to search by Path. We called it runCMD.
-In our function, it creates a child with fork. 
-The child then execs the function using execvp and throws a 
-perror if it can't. The parent then waits until the function is 
-successfully completed and then gives the completion statement along with 
-printing the command that it was asked to run.
-If none of this happens, a perror is thrown for a forking error.
+1.  Execution of user-supplied commands with optional arguments
+2.  Selection of typical builtin commands
+3.  Redirection of the standard output of commands to files
+4.  Composition of commands via piping
+5.  Background jobs
 
-Phase 2, Phase 4: 
-Parsing our command line happens in our parseCMD function. 
-This function allows for us to collect all of the arguments in 
-an array of strings that we can use to run later using the runCMD 
-that we made in phase 1. We take the inputted commands, then 
-tokenize it using strtok() with blank space as the delimiter. This 
-allows for the collection of all arguments and commands.
+## Jobs
+Each command line string is considered a job. Each job is represented by a struct, which keeps track of the generated process ID's, the original string from the command line that needs to be printed out during the completion statement, a place to store the statuses of each small command, how many commands there are to fork, and if the job completion statement was printed out or not. Each job, when created, is then stored in the Job Table, to make sure we keep track of how many jobs are active at a time. One limitation of this Job Table is that we are only able to store 5000 jobs in it at a time. meaning that if somehow, the user inputs 5000 lines into our command line without exiting, a segmentation fault would occur.
 
-We chose to implement phase 4 before phase 3 here since we were 
-working on the parsing of the command line. Phase 4 just detects if 
-the next token is either <, >, >>, or | for all of the special cases. 
-We implemented the first three, and created three special redirects. 
-RedIn, RedOut, and RedOut2 for each respectively. 
-RedIn opened the file after for reading only. RedOut opened it for 
-overwriting or creating, and RedOut2 opened it for appending. Each 
-used the open() command, with RedOut and RedOut2 giving write permission
-and opening for write only.
-We also detected the pipeline | for later.
+## Reading and Parsing
 
-Phase 3:
-Phase three just detected if the command line was pwd or cd and 
-threw an error if cd couldn't happen. This is implemented by parsing 
-the command line, checking if it is pwd or cd (DIRECTORY) and calling 
-the respective command.
+Once the sshell prompt is printed and user input is submitted, the shell parses the command given by the user. It does this through tokenizing a copy of the command string, separating it by whitespace. Each individual "word" in the command is considered an argument to be stored and executed later. 
 
-Phase 5:
-The implementation of pipelines happened in our runPiped function.
-In runPiped, we input the command line as an array of an array of 
-strings, broken up by the pipeline delimiter to make it easier to loop
-for us. We then track the old FD and STDOUT to make sure we are grabbing
-information and sending it to the right place. Then, we loop the 
-required amount of times (given by how many arrays are in our array), 
-calling pipe each time. What we do each time in the loop the 
-amount of arrays that are stored out of a maximum of 3. 
+If the command parser finds ">", or ">>", then we know that our output is being sent to a different file. So we invoke our output redirectors, and set our standard output to the next token (if it can be opened), since that will be the name of the file.  
 
-PIPING EXPLANATION // 
 
-Phase 6:
-Writing to append was not hard, we just added an extra function 
-called redOut2 which was called when the ">>" was seen, and was the 
-output redirector but with O_APPEND in the open function instead.
+## Basic Job Running
+The cleaned string from pre processing is fed into the runPiped() function which handles the determination of how many commands there are through tokenizing with the delimiter of "|" and creates a job.  In the case that there is just one command and no pipelining, tokenizing the command string by the "|" delimiter will return the whole string.
 
-BACKGROUND JOBS //
+Running a simple, one command job involves invoking runCMD which executes the fork + wait + exit method we discussed in class.
 
-Anthony and I were able to test our program through copying the examples 
-that were given by the Professor on his project 1 html file. We then 
-made sure that our file compiled on the CSIF and ran it against the
-simple grader that he gave. Then, we generated a few misc test cases
-of our own to make sure it threw the correct errors, and tried to 
-break our own program. 
+If the user invokes a builtin function, we sense than in our main function and use the respective C functions accordingly. 
 
-We used no code from sources other than the lecture files and 
-sample code given by the Professor. 
+## Pipelines
+Pipelines are achieved by tokenizing the command string (after preprocessing) with the "|" delimiter. This allows us to determine how many commands are being pipelined, and process each command individually. The results of each processed command are stored in an array that contains each command in their own array.
 
+Each smaller array is then sent off into its own runCMDPiped, forked, and stored in the job table, with the last one going into the original runCMD which can print the completion statement it if it is not a background task. 
+
+## Background Job
+A job is considered a background job if the "&" symbol is found at the end of the inputted command string. When this happens, the variable 'background' is turned to 1, signifying that the next job that is about to be created is a background job. Each job, regardless of being background or not, is stored in the Job Table.  
+
+A job that isn't a background job is printed at the end of the command being run, and is automatically considered written in the job table. 
+
+With background jobs, the completion statement is postponed until, at minimum, the next command is inputted. Once the next command is inputted, the shell runs through the Job Table and checks if there are commands that haven't been printed. If it finds one, it checks the status of all of the job's children. If any have not finished, it does not print the job completion statement. However, if all are finished, then the completion sentence is printed and the job is marked as done. Once the Job Table has finished parsing, then the new command is executed and its completion statement is printed if not a background task. 
+
+## Testing the Program
+We were able to test our program through copying the examples that were given by the Professor on his project 1 html file. We then made sure that our file compiled on the CSIF and ran it against the simple grader that he gave. Then, we generated a few misc test cases of our own to make sure it threw the correct errors, and tried to break our own program. 
+
+We used no code from sources other than the lecture files and sample code given by the Professor. 
 
