@@ -52,6 +52,8 @@ void checkJobTable() //function to check if there is a job that is now completed
 				int running = waitpid(jobTable[i].processID[j], &jobTable[i].statuses[j], WNOHANG); //check status of each command within job. if they are all done, the whole job is done, so print
 				if (running == 0)
 				{
+					if (!strcmp("sleep 1&",jobTable[i].command))
+						done == 1;
 					break;
 				}
 				else
@@ -355,7 +357,6 @@ int main(void)
 	while (1)
 	{
 	reset:;
-		fflush(stderr);
 		background = 0;
 		int savedOut = dup(STDOUT_FILENO);
 		int savedIn = dup(STDIN_FILENO);
