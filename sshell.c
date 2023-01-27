@@ -16,10 +16,10 @@ void runPiped(char *cmd, char *originalCMD);
 int redOut2(char *file);
 int redOut(char *file);
 int redIn(char *file);
-int checkCLError(char** args);
+int checkCLError(char **args);
 void error_(int error);
 
-enum errors //Error list for error handling
+enum errors // Error list for error handling
 {
 	tooManyArgs,
 	missingCommand,
@@ -33,7 +33,7 @@ enum errors //Error list for error handling
 	none
 };
 
-struct job //class made for creating background processes
+struct job // class made for creating background processes
 {
 	pid_t processID[4];
 	char command[512];
@@ -43,10 +43,10 @@ struct job //class made for creating background processes
 };
 
 struct job jobTable[5000]; // job table to keep track of all jobs
-int background = 0; //keeps track if there is a background statement
-int numJob = 0; // keeps track of what number we are on in the jobTable
+int background = 0;		   // keeps track if there is a background statement
+int numJob = 0;			   // keeps track of what number we are on in the jobTable
 
-int checkCLError(char** args)
+int checkCLError(char **args)
 {
 	if (args == NULL)
 	{
@@ -54,16 +54,16 @@ int checkCLError(char** args)
 		return 0;
 	}
 	int i = 0;
-	while(args[i] != NULL)
+	while (args[i] != NULL)
 	{
 		if (!strcmp(args[i], ">") || !strcmp(args[i], ">>") || !strcmp(args[i], "|"))
 		{
-			if(i == 0|| args[i+1] == NULL)
+			if (i == 0 || args[i + 1] == NULL)
 			{
 				error_(missingCommand);
 				return 0;
 			}
-			if(!strcmp(args[i], ">"))// && args[i+1] == NULL)
+			if (!strcmp(args[i], ">")) // && args[i+1] == NULL)
 			{
 				error_(noOutputFile);
 				return -1;
@@ -74,17 +74,17 @@ int checkCLError(char** args)
 	return 1;
 }
 
-void printJob(struct job s) //function to print completion statement from job table
+void printJob(struct job s) // function to print completion statement from job table
 {
-	fprintf(stderr, "+ completed '%s' ", s.command); 
+	fprintf(stderr, "+ completed '%s' ", s.command);
 	for (int i = 0; i < s.ncp; i++)
 	{
-		fprintf(stderr, "[%d]", s.statuses[i]); //ex. + completed 'cat test2.txt | sort' {[0][0]}
+		fprintf(stderr, "[%d]", s.statuses[i]); // ex. + completed 'cat test2.txt | sort' {[0][0]}
 	}
 	fprintf(stderr, "\n");
 }
 
-void checkJobTable() //function to check if there is a job that is now completed that hasn't been printed
+void checkJobTable() // function to check if there is a job that is now completed that hasn't been printed
 {
 	for (int i = 0; i < 5000; i++)
 	{
@@ -93,10 +93,10 @@ void checkJobTable() //function to check if there is a job that is now completed
 			int done = 0;
 			for (int j = 0; j < jobTable[i].ncp; j++)
 			{
-				int running = waitpid(jobTable[i].processID[j], &jobTable[i].statuses[j], WNOHANG); //check status of each command within job. if they are all done, the whole job is done, so print
+				int running = waitpid(jobTable[i].processID[j], &jobTable[i].statuses[j], WNOHANG); // check status of each command within job. if they are all done, the whole job is done, so print
 				if (running == 0)
 				{
-					if (!strcmp("sleep 1&",jobTable[i].command))
+					if (!strcmp("sleep 1&", jobTable[i].command))
 					{
 						done = 1;
 						jobTable[i].statuses[j] = 0;
@@ -120,9 +120,7 @@ void checkJobTable() //function to check if there is a job that is now completed
 	}
 }
 
-
-
-void printExit(char *myCommand, int statuses[], int ncp) //print from commands, not job table
+void printExit(char *myCommand, int statuses[], int ncp) // print from commands, not job table
 {
 	fprintf(stderr, "+ completed '%s' ", myCommand);
 	for (int i = 0; i < ncp; i++)
@@ -132,7 +130,7 @@ void printExit(char *myCommand, int statuses[], int ncp) //print from commands, 
 	fprintf(stderr, "\n");
 }
 
-void error_(int error) //self explanatory
+void error_(int error) // self explanatory
 {
 	switch (error)
 	{
@@ -168,7 +166,6 @@ void error_(int error) //self explanatory
 		break;
 	}
 }
-
 
 /*
 Surround key characters such as "|", ">", etc with spaces in case user didn't.
@@ -219,7 +216,7 @@ Therefore we can use this command in place of it for single non-piped commands a
 */
 void runPiped(char *cmd, char *originalCMD)
 {
-	strcpy(jobTable[numJob].command, originalCMD); //take note of command and add it to jobtable
+	strcpy(jobTable[numJob].command, originalCMD); // take note of command and add it to jobtable
 	char temp[512];
 	strcpy(temp, cmd);
 	char *cmd1 = NULL;
@@ -236,11 +233,11 @@ void runPiped(char *cmd, char *originalCMD)
 		j++;
 		buffer = strtok(NULL, "|");
 	}
-	jobTable[numJob].ncp = j;  // take note of amount of commands and add it to job table
+	jobTable[numJob].ncp = j; // take note of amount of commands and add it to job table
 	int statuses[j];
 	char **allCMDS2[] = {parseCMD(allCMDS[0]), parseCMD(allCMDS[1]), parseCMD(allCMDS[2]), parseCMD(allCMDS[3]), NULL};
-	//Developed in a way to reuse our runCMD function. A new pipe will be created in between every command
-	//A fork is created every command as well to ensure the parent will never run an execvp.
+	// Developed in a way to reuse our runCMD function. A new pipe will be created in between every command
+	// A fork is created every command as well to ensure the parent will never run an execvp.
 	int fd[2];
 	int oldfd = 0;
 	int oldSTDOUT = dup(STDOUT_FILENO);
@@ -274,7 +271,7 @@ void runPiped(char *cmd, char *originalCMD)
 	if (!background)
 	{
 		printExit(originalCMD, statuses, j);
-		jobTable[numJob].printed = 1; //if it isn't a background task, we need to print asap, and can mark it as printed and done.
+		jobTable[numJob].printed = 1; // if it isn't a background task, we need to print asap, and can mark it as printed and done.
 	}
 }
 
@@ -289,7 +286,7 @@ int runCMD(char **argv, int whatNo)
 	{
 		// Child
 		int status = execvp(argv[0], argv);
-		if(status < 0)
+		if (status < 0)
 			error_(commandNotFound);
 
 		exit(1);
@@ -353,7 +350,7 @@ int redIn(char *file)
 	dup2(fd, STDIN_FILENO);
 	return 1;
 }
-//parse the cmd from a single string to an array of strings
+// parse the cmd from a single string to an array of strings
 char **parseCMD(char *string)
 {
 	int numArgs = 0;
@@ -372,34 +369,34 @@ char **parseCMD(char *string)
 		}
 		if (!strcmp(buffer, "<"))
 		{
-			if(i == 0)
+			if (i == 0)
 			{
 				error_(missingCommand);
 				return NULL;
 			}
-			if(redIn(strtok(NULL, " ")) < 0)
+			if (redIn(strtok(NULL, " ")) < 0)
 				return NULL;
 			buffer = strtok(NULL, " ");
 		}
 		else if (!strcmp(buffer, ">"))
 		{
-			if(i == 0)
+			if (i == 0)
 			{
 				error_(missingCommand);
 				return NULL;
 			}
-			if(redOut(strtok(NULL, " ")) < 0)
+			if (redOut(strtok(NULL, " ")) < 0)
 				return NULL;
 			buffer = strtok(NULL, " ");
 		}
 		else if (!strcmp(buffer, ">>"))
 		{
-			if(i == 0)
+			if (i == 0)
 			{
 				error_(missingCommand);
 				return NULL;
 			}
-			if(redOut2(strtok(NULL, " ")) < 0)
+			if (redOut2(strtok(NULL, " ")) < 0)
 				return NULL;
 			buffer = strtok(NULL, " ");
 			buffer = strtok(NULL, " ");
@@ -440,9 +437,10 @@ int main(void)
 			exit(1); // Error: Failed to get command from CLI
 
 		/* Print command line if stdin is not provided by terminal */
-		if (!isatty(STDIN_FILENO)) {
-		        printf("%s", cmd);
-		        fflush(stdout);
+		if (!isatty(STDIN_FILENO))
+		{
+			printf("%s", cmd);
+			fflush(stdout);
 		}
 
 		/* Remove trailing newline from command line */
@@ -454,12 +452,12 @@ int main(void)
 		strcpy(originalCMD, cmd);
 		strcpy(cmd2, cmd);
 		char **args = parseCMD(cmd2); // for build in cmds
-		
+
 		if (args == NULL)
 		{
 			goto trueReset;
 		}
-		if(checkCLError(args) == -1)
+		if (checkCLError(args) == -1)
 		{
 			goto trueReset;
 		}
@@ -469,7 +467,7 @@ int main(void)
 		if (nl)
 			*nl = '\0';
 
-		if(!strcmp(cmd,"\0"))
+		if (!strcmp(cmd, "\0"))
 		{
 			checkJobTable();
 			memset(cmd, 0, sizeof cmd);
@@ -482,9 +480,34 @@ int main(void)
 		/* Builtin commands */
 		if (!strcmp(cmd, "exit"))
 		{
-			fprintf(stderr, "Bye...\n");
-			fprintf(stderr, "+ completed 'exit' [0]\n");
-			break;
+			int cantExit = 0;
+			for (int i = 0; i < 5000; i++)
+			{
+				if (jobTable[i].printed == 0)
+				{
+					for (int j = 0; j < jobTable[i].ncp; j++)
+					{
+						int running = waitpid(jobTable[i].processID[j], &jobTable[i].statuses[j], WNOHANG);
+						if (running == 0)
+						{
+							cantExit = 1;
+							break;
+						}
+					}
+				}
+			}
+			if (cantExit == 0)
+			{
+				fprintf(stderr, "Bye...\n");
+				fprintf(stderr, "+ completed 'exit' [0]\n");
+				break;
+			}
+			else
+			{
+				// throw error here
+				fprintf(stderr, "+ completed 'exit' [1]\n");
+				goto reset;
+			}
 		}
 		else if (!strcmp(cmd, "pwd"))
 		{
@@ -508,7 +531,7 @@ int main(void)
 		checkJobTable();
 		runPiped(postCMD, originalCMD);
 		numJob++;
-		trueReset:;
+	trueReset:;
 		/* Free all manually allocated memory*/
 		memset(cmd, 0, sizeof cmd);
 		free(args);
