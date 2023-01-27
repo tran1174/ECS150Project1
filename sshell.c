@@ -355,6 +355,7 @@ int main(void)
 	while (1)
 	{
 	reset:;
+		fflush(stderr);
 		background = 0;
 		int savedOut = dup(STDOUT_FILENO);
 		int savedIn = dup(STDIN_FILENO);
