@@ -17,7 +17,7 @@ void redOut2(char *file);
 void redOut(char *file);
 void redIn(char *file);
 
-struct job
+struct job //class made for creating background processes
 {
 	pid_t processID[4];
 	char command[512];
@@ -35,7 +35,7 @@ void printJob(struct job s) //function to print completion statement from job ta
 	fprintf(stderr, "+ completed '%s' ", s.command); 
 	for (int i = 0; i < s.ncp; i++)
 	{
-		fprintf(stderr, "[%d]", s.statuses[i]);
+		fprintf(stderr, "[%d]", s.statuses[i]); //ex. + completed 'cat test2.txt | sort' {[0][0]}
 	}
 	fprintf(stderr, "\n");
 }
@@ -76,7 +76,7 @@ void checkJobTable() //function to check if there is a job that is now completed
 	}
 }
 
-enum errors
+enum errors //Error list for error handling
 {
 	tooManyArgs,
 	missingCommand,
@@ -100,7 +100,7 @@ void printExit(char *myCommand, int statuses[], int ncp) //print from commands, 
 	fprintf(stderr, "\n");
 }
 
-void error_(int error)
+void error_(int error) //self explanatory
 {
 	switch (error)
 	{
@@ -137,20 +137,12 @@ void error_(int error)
 	}
 }
 
-void print3DStringArray(char ***arr)
-{
-	while (*arr != NULL)
-		printStringArray(*arr++);
-}
 
-void printStringArray(char **arr)
-{
-	int i = 0;
-	while (arr[i] != NULL)
-		fprintf(stderr, "%s ", arr[i++]);
-	printf("\n");
-}
-
+/*
+Surround key characters such as "|", ">", etc with spaces in case user didn't.
+Allows parser to properly tokenize arguments
+Extra spaces won't matter since strtok(," ") will use ALL spaces between as delimiter
+*/
 char *preProcessCMD(char *cmd)
 {
 	int j = 0;
@@ -187,6 +179,11 @@ char *preProcessCMD(char *cmd)
 	return postProcess;
 }
 
+/*
+Main function that will run all commands regardless of piped or not.
+runCMD (function that you'll see later) is a subset of this command.
+Therefore we can use this command in place of it for single non-piped commands as well.
+*/
 void runPiped(char *cmd, char *originalCMD)
 {
 	strcpy(jobTable[numJob].command, originalCMD); //take note of command and add it to jobtable
@@ -209,7 +206,8 @@ void runPiped(char *cmd, char *originalCMD)
 	jobTable[numJob].ncp = j;  // take note of amount of commands and add it to job table
 	int statuses[j];
 	char **allCMDS2[] = {parseCMD(allCMDS[0]), parseCMD(allCMDS[1]), parseCMD(allCMDS[2]), parseCMD(allCMDS[3]), NULL};
-
+	//Developed in a way to reuse our runCMD function. A new pipe will be created in between every command
+	//A fork is created every command as well to ensure the parent will never run an execvp.
 	int fd[2];
 	int oldfd = 0;
 	int oldSTDOUT = dup(STDOUT_FILENO);
@@ -232,7 +230,7 @@ void runPiped(char *cmd, char *originalCMD)
 		}
 		else
 		{
-			statuses[i] = runCMDPipe(allCMDS2[i], i);
+			statuses[i] = runCMD(allCMDS2[i], i);
 			jobTable[numJob].statuses[i] = statuses[i];
 			oldfd = fd[0];
 			dup2(oldfd, 0);
@@ -246,34 +244,35 @@ void runPiped(char *cmd, char *originalCMD)
 		jobTable[numJob].printed = 1; //if it isn't a background task, we need to print asap, and can mark it as printed and done.
 	}
 }
-// fork+wait+exit from Jean Porquet
-int runCMDPipe(char **argv, int whatNo /*, int wait*/)
-{
-	pid_t pid;
-	pid = fork();
-	jobTable[numJob].processID[whatNo] = pid; // keep track of the process id so that we can use it later
-	if (pid == 0)
-	{
-		// Child
-		execvp(argv[0], argv);
-		perror("execvp");
-		exit(1);
-	}
-	else if (pid > 0)
-	{
-		// Parent
-		int status;
-		if (!background)
-			waitpid(pid, &status, 0);
-		return WEXITSTATUS(status);
-	}
-	else
-	{
-		perror("fork");
-		exit(1);
-	}
-}
-int runCMD(char **argv, int whatNo /*, int wait*/)
+// fork+wait+exit from Jean Porquet; modified for use in between pipe commands
+// int runCMDPipe(char **argv, int whatNo)
+// {
+// 	pid_t pid;
+// 	pid = fork();
+// 	jobTable[numJob].processID[whatNo] = pid; // keep track of the process id so that we can use it later
+// 	if (pid == 0)
+// 	{
+// 		// Child
+// 		execvp(argv[0], argv);
+// 		perror("execvp");
+// 		exit(1);
+// 	}
+// 	else if (pid > 0)
+// 	{
+// 		// Parent
+// 		int status;
+// 		if (!background)
+// 			waitpid(pid, &status, 0);
+// 		return WEXITSTATUS(status);
+// 	}
+// 	else
+// 	{
+// 		perror("fork");
+// 		exit(1);
+// 	}
+// }
+// exactly the same as the function above, but prints the 
+int runCMD(char **argv, int whatNo)
 {
 	int pid;
 	pid = fork();
