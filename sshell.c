@@ -244,34 +244,8 @@ void runPiped(char *cmd, char *originalCMD)
 		jobTable[numJob].printed = 1; //if it isn't a background task, we need to print asap, and can mark it as printed and done.
 	}
 }
-// fork+wait+exit from Jean Porquet; modified for use in between pipe commands
-// int runCMDPipe(char **argv, int whatNo)
-// {
-// 	pid_t pid;
-// 	pid = fork();
-// 	jobTable[numJob].processID[whatNo] = pid; // keep track of the process id so that we can use it later
-// 	if (pid == 0)
-// 	{
-// 		// Child
-// 		execvp(argv[0], argv);
-// 		perror("execvp");
-// 		exit(1);
-// 	}
-// 	else if (pid > 0)
-// 	{
-// 		// Parent
-// 		int status;
-// 		if (!background)
-// 			waitpid(pid, &status, 0);
-// 		return WEXITSTATUS(status);
-// 	}
-// 	else
-// 	{
-// 		perror("fork");
-// 		exit(1);
-// 	}
-// }
-// exactly the same as the function above, but prints the 
+
+// fork+wait+exit from Jean Porquet; we print completion message elsewhere
 int runCMD(char **argv, int whatNo)
 {
 	int pid;
@@ -310,13 +284,13 @@ void redOut(char *file)
 	int fd = open(file, O_WRONLY | O_CREAT | O_TRUNC, 0644);
 	dup2(fd, STDOUT_FILENO);
 }
-// Function to redirect
+// Function to redirect in
 void redIn(char *file)
 {
 	int fd = open(file, O_RDONLY);
 	dup2(fd, STDIN_FILENO);
 }
-
+//parse the cmd from a single string to an array of strings
 char **parseCMD(char *string)
 {
 	if (string == NULL)
@@ -388,9 +362,7 @@ int main(void)
 		strcpy(originalCMD, cmd);
 		strcpy(cmd2, cmd);
 
-		char **args = parseCMD(cmd2);
-
-		
+		char **args = parseCMD(cmd2); // for build in cmds
 
 		/* Remove trailing newline from command line */
 		nl = strchr(cmd, '\n');
