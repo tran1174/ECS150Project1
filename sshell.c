@@ -175,17 +175,24 @@ Extra spaces won't matter since strtok(," ") will use ALL spaces between as deli
 char *preProcessCMD(char *cmd)
 {
 	int j = 0;
+	int redirFlag = 0;
 	char *postProcess = malloc(512);
 	for (int i = 0; i < (int)strlen(cmd); i++)
 	{
 		if (cmd[i] == '|' || cmd[i] == '<')
 		{
+			if(cmd[i] == '|' && redirFlag)
+			{
+				error_(mislocatedOutputRedir);
+				return NULL;
+			}
 			postProcess[j++] = ' ';
 			postProcess[j++] = cmd[i];
 			postProcess[j++] = ' ';
 		}
 		else if (cmd[i] == '>')
 		{
+			redirFlag = 1;
 			postProcess[j++] = ' ';
 			postProcess[j++] = '>';
 			if (cmd[i + 1] == '>')
@@ -197,6 +204,11 @@ char *preProcessCMD(char *cmd)
 		}
 		else if (cmd[i] == '&')
 		{
+			if(i != (int)(strlen(cmd)-1))
+			{
+				error_(mislocatedBackground);
+				return NULL;
+			}
 			background = 1;
 			postProcess[j++] = ' ';
 		}
@@ -451,6 +463,9 @@ int main(void)
 		/* Save original command to pass through and print later*/
 		strcpy(originalCMD, cmd);
 		strcpy(cmd2, cmd);
+
+		char *postCMD = preProcessCMD(cmd);
+
 		char **args = parseCMD(cmd2); // for build in cmds
 
 		if (args == NULL)
@@ -475,7 +490,12 @@ int main(void)
 			dup2(savedIn, STDIN_FILENO);
 			goto reset;
 		}
-		char *postCMD = preProcessCMD(cmd);
+		
+
+		if (postCMD == NULL)
+		{
+			goto trueReset;
+		}
 
 		/* Builtin commands */
 		if (!strcmp(cmd, "exit"))
@@ -504,9 +524,9 @@ int main(void)
 			}
 			else
 			{
-				// throw error here
+				error_(activeJobs);
 				fprintf(stderr, "+ completed 'exit' [1]\n");
-				goto reset;
+				goto trueReset;
 			}
 		}
 		else if (!strcmp(cmd, "pwd"))
