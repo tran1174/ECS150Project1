@@ -395,7 +395,7 @@ int main(void)
 		char *nl;
 
 		/* Print prompt */
-		printf("sshell$ ");
+		printf("sshell@ucd$ ");
 		fflush(stdout);
 
 		/* Get command line */
@@ -445,6 +445,7 @@ int main(void)
 		{
 			if (chdir(args[1]) == -1)
 				perror("Failed to change directory");
+			fprintf(stderr, "+ completed 'cd %s' [0]\n", args[1]);
 			goto reset;
 		}
 
