@@ -7,15 +7,31 @@
 
 #define CMDLINE_MAX 512
 #define ARG_MAX 16
+
 int runCMD(char *argv[], int whatNo);
-int runCMDPipe(char *argv[], int whatNo);
 char **parseCMD(char *string);
 void printStringArray(char **arr);
 char *preProcessCMD(char *cmd);
 void runPiped(char *cmd, char *originalCMD);
-void redOut2(char *file);
-void redOut(char *file);
-void redIn(char *file);
+int redOut2(char *file);
+int redOut(char *file);
+int redIn(char *file);
+int checkCLError(char** args);
+void error_(int error);
+
+enum errors //Error list for error handling
+{
+	tooManyArgs,
+	missingCommand,
+	noOutputFile,
+	cannotOpen,
+	mislocatedOutputRedir,
+	cannotCD,
+	commandNotFound,
+	mislocatedBackground,
+	activeJobs,
+	none
+};
 
 struct job //class made for creating background processes
 {
@@ -29,6 +45,34 @@ struct job //class made for creating background processes
 struct job jobTable[5000]; // job table to keep track of all jobs
 int background = 0; //keeps track if there is a background statement
 int numJob = 0; // keeps track of what number we are on in the jobTable
+
+int checkCLError(char** args)
+{
+	if (args == NULL)
+	{
+		error_(missingCommand);
+		return 0;
+	}
+	int i = 0;
+	while(args[i] != NULL)
+	{
+		if (!strcmp(args[i], ">") || !strcmp(args[i], ">>") || !strcmp(args[i], "|"))
+		{
+			if(i == 0|| args[i+1] == NULL)
+			{
+				error_(missingCommand);
+				return 0;
+			}
+			if(!strcmp(args[i], ">"))// && args[i+1] == NULL)
+			{
+				error_(noOutputFile);
+				return -1;
+			}
+		}
+		i++;
+	}
+	return 1;
+}
 
 void printJob(struct job s) //function to print completion statement from job table
 {
@@ -76,19 +120,7 @@ void checkJobTable() //function to check if there is a job that is now completed
 	}
 }
 
-enum errors //Error list for error handling
-{
-	tooManyArgs,
-	missingCommand,
-	noOutputFile,
-	cannotOpen,
-	mislocatedOutputRedir,
-	cannotCD,
-	commandNotFound,
-	mislocatedBackground,
-	activeJobs,
-	none
-};
+
 
 void printExit(char *myCommand, int statuses[], int ncp) //print from commands, not job table
 {
@@ -255,8 +287,10 @@ int runCMD(char **argv, int whatNo)
 	if (pid == 0)
 	{
 		// Child
-		execvp(argv[0], argv);
-		perror("execvp");
+		int status = execvp(argv[0], argv);
+		if(status < 0)
+			error_(commandNotFound);
+
 		exit(1);
 	}
 	else if (pid > 0)
@@ -273,55 +307,112 @@ int runCMD(char **argv, int whatNo)
 	}
 }
 // Function to redirect output to specified file (appends)
-void redOut2(char *file)
+int redOut2(char *file)
 {
+	if (file == NULL)
+	{
+		error_(noOutputFile);
+		return -1;
+	}
 	int fd = open(file, O_WRONLY | O_APPEND, 0644);
+	if (fd < 0)
+	{
+		error_(cannotOpen);
+		return -1;
+	}
 	dup2(fd, STDOUT_FILENO);
+	return 1;
 }
 // Function to redirect output to specified file (overwrites)
-void redOut(char *file)
+int redOut(char *file)
 {
+	if (file == NULL)
+	{
+		error_(noOutputFile);
+		return -1;
+	}
 	int fd = open(file, O_WRONLY | O_CREAT | O_TRUNC, 0644);
+	if (fd < 0)
+	{
+		error_(cannotOpen);
+		return -1;
+	}
 	dup2(fd, STDOUT_FILENO);
+	return 1;
 }
 // Function to redirect in
-void redIn(char *file)
+int redIn(char *file)
 {
 	int fd = open(file, O_RDONLY);
+	if (fd < 0)
+	{
+		error_(cannotOpen);
+		return -1;
+	}
 	dup2(fd, STDIN_FILENO);
+	return 1;
 }
 //parse the cmd from a single string to an array of strings
 char **parseCMD(char *string)
 {
+	int numArgs = 0;
 	if (string == NULL)
 		return NULL;
 	int i = 0;
 	char **args = malloc(ARG_MAX * sizeof(char *));
 	char *buffer = strtok(string, " ");
-
+	numArgs++;
 	while (buffer != NULL)
 	{
+		if (numArgs > 16)
+		{
+			error_(tooManyArgs);
+			return NULL;
+		}
 		if (!strcmp(buffer, "<"))
 		{
-			redIn(strtok(NULL, " "));
+			if(i == 0)
+			{
+				error_(missingCommand);
+				return NULL;
+			}
+			if(redIn(strtok(NULL, " ")) < 0)
+				return NULL;
 			buffer = strtok(NULL, " ");
 		}
 		else if (!strcmp(buffer, ">"))
 		{
-			redOut(strtok(NULL, " "));
+			if(i == 0)
+			{
+				error_(missingCommand);
+				return NULL;
+			}
+			if(redOut(strtok(NULL, " ")) < 0)
+				return NULL;
 			buffer = strtok(NULL, " ");
 		}
 		else if (!strcmp(buffer, ">>"))
 		{
-			redOut2(strtok(NULL, " "));
+			if(i == 0)
+			{
+				error_(missingCommand);
+				return NULL;
+			}
+			if(redOut2(strtok(NULL, " ")) < 0)
+				return NULL;
 			buffer = strtok(NULL, " ");
 			buffer = strtok(NULL, " ");
 		}
 		args[i] = buffer;
+		numArgs++;
 		buffer = strtok(NULL, " ");
 		i++;
 	}
-
+	if (args == NULL)
+	{
+		error_(missingCommand);
+		return NULL;
+	}
 	return args;
 }
 
@@ -361,13 +452,22 @@ int main(void)
 		/* Save original command to pass through and print later*/
 		strcpy(originalCMD, cmd);
 		strcpy(cmd2, cmd);
-
 		char **args = parseCMD(cmd2); // for build in cmds
+		
+		if (args == NULL)
+		{
+			goto trueReset;
+		}
+		if(checkCLError(args) == -1)
+		{
+			goto trueReset;
+		}
 
 		/* Remove trailing newline from command line */
 		nl = strchr(cmd, '\n');
 		if (nl)
 			*nl = '\0';
+
 		if(!strcmp(cmd,"\0"))
 		{
 			checkJobTable();
@@ -393,9 +493,13 @@ int main(void)
 		}
 		else if (!strcmp(args[0], "cd"))
 		{
+			int status = 0;
 			if (chdir(args[1]) == -1)
-				perror("Failed to change directory");
-			fprintf(stderr, "+ completed 'cd %s' [0]\n", args[1]);
+			{
+				error_(cannotCD);
+				status = 1;
+			}
+			fprintf(stderr, "+ completed 'cd %s' [%d]\n", args[1], status);
 			goto reset;
 		}
 
@@ -403,7 +507,7 @@ int main(void)
 		checkJobTable();
 		runPiped(postCMD, originalCMD);
 		numJob++;
-
+		trueReset:;
 		/* Free all manually allocated memory*/
 		memset(cmd, 0, sizeof cmd);
 		free(args);
