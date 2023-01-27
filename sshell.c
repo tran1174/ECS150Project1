@@ -414,10 +414,10 @@ int main(void)
 		char **args = parseCMD(cmd2);
 
 		/* Print command line if stdin is not provided by terminal */
-		// if (!isatty(STDIN_FILENO)) {
-		//         printf("%s", cmd);
-		//         fflush(stdout);
-		// }
+		if (!isatty(STDIN_FILENO)) {
+		        printf("%s", cmd);
+		        fflush(stdout);
+		}
 
 		/* Remove trailing newline from command line */
 		nl = strchr(cmd, '\n');
