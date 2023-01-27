@@ -194,6 +194,7 @@ char *preProcessCMD(char *cmd)
 			if (cmd[i + 1] == '>')
 			{
 				postProcess[j++] = '>';
+				i++;
 			}
 			postProcess[j++] = ' ';
 		}
